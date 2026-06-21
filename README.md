@@ -4,6 +4,56 @@
 
 Stress Skeleton is a pronunciation-first WebExtension for English learners. It keeps the live-page pronunciation analysis workflow for websites such as Wikipedia and adds a real-time stress-skeleton overlay for YouTube English subtitles.
 
+### Quick Start
+
+Run these commands from the project root:
+
+```sh
+npm install
+npm run package:browsers
+```
+
+This creates ready-to-install browser builds in `outputs/browser-builds/`.
+
+### How To Use
+
+#### Chrome Or Edge
+
+1. Open the extension page:
+   - Chrome: `chrome://extensions`
+   - Edge: `edge://extensions`
+2. Turn on Developer mode.
+3. Choose `Load unpacked`.
+4. Select `outputs/browser-builds/chrome` for Chrome or `outputs/browser-builds/edge` for Edge.
+
+If you prefer the zip package, use:
+
+```text
+outputs/browser-builds/bi-read-pronunciation-chrome.zip
+outputs/browser-builds/bi-read-pronunciation-edge.zip
+```
+
+#### Firefox
+
+1. Open `about:debugging`.
+2. Choose `This Firefox`.
+3. Select `Load Temporary Add-on`.
+4. Pick `outputs/browser-builds/firefox/manifest.json`.
+
+For the packaged upload file, use:
+
+```text
+outputs/browser-builds/bi-read-pronunciation-firefox.zip
+```
+
+#### Safari
+
+```sh
+npm run convert:safari
+```
+
+Then open the generated Xcode project in `safari/`, build the app target, and enable the extension in Safari settings.
+
 ### Features
 
 - Analyze selected English text on live web pages.
