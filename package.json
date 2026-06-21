@@ -9,7 +9,8 @@
     "clean": "rm -rf dist safari",
     "package:chrome": "npm run build && cd dist && zip -r ../outputs/bi-read-translator-chrome.zip .",
     "convert:safari": "npm run build && xcrun safari-web-extension-converter dist --project-location safari --app-name BiReadTranslator --bundle-identifier com.codex.bireadtranslator",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "tts:server": "npm --prefix tts-server start"
   },
   "keywords": [
     "webextension",

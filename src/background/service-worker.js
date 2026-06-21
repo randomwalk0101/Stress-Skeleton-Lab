@@ -84,6 +84,14 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "BIREAD_TTS_LOCAL") {
+    getSettings()
+      .then(settings => synthesizeWithLocalTts(message.text, message.rate, settings))
+      .then(audio => sendResponse({ ok: true, audio }))
+      .catch(error => sendResponse(toError(error)));
+    return true;
+  }
+
   return false;
 });
 
@@ -320,9 +328,9 @@ Return JSON with:
 - original: the exact original text
 - stress_skeleton: phrase groups split with /, marking main stressed words in uppercase
 - word_stress: multi-syllable words only; mark stressed syllables in uppercase, with a short Chinese note
-- linking_reduction: weak forms, linking, reductions, elision, concise Chinese notes
+- linking_reduction: the 3 to 8 most useful weak forms, linking, reductions, and elisions; concise Chinese notes; do not over-analyze
 - flap_t: /t/ or /d/ places that may become American flap, concise Chinese notes
-- ipa: important words only, with General American IPA
+- ipa_keywords: important words only, with General American IPA; do not transcribe the whole sentence
 - practice_tip: one short Chinese sentence telling the learner what to imitate most`;
 }
 
@@ -363,7 +371,7 @@ function pronunciationSchema() {
           note: { type: "string" }
         })
       },
-      ipa: {
+      ipa_keywords: {
         type: "array",
         items: item({
           word: { type: "string" },
@@ -372,7 +380,7 @@ function pronunciationSchema() {
       },
       practice_tip: { type: "string" }
     },
-    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa", "practice_tip"]
+    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa_keywords", "practice_tip"]
   };
 }
 
@@ -411,7 +419,7 @@ function geminiPronunciationSchema() {
           note: { type: "STRING" }
         })
       },
-      ipa: {
+      ipa_keywords: {
         type: "ARRAY",
         items: item({
           word: { type: "STRING" },
@@ -420,8 +428,8 @@ function geminiPronunciationSchema() {
       },
       practice_tip: { type: "STRING" }
     },
-    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa", "practice_tip"],
-    propertyOrdering: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa", "practice_tip"]
+    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa_keywords", "practice_tip"],
+    propertyOrdering: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa_keywords", "practice_tip"]
   };
 }
 
@@ -433,7 +441,7 @@ function parseOpenAIJson(data) {
   if (!outputText) throw new Error("OpenAI returned an empty response.");
 
   try {
-    return JSON.parse(outputText);
+    return normalizePronunciationAnalysis(JSON.parse(outputText));
   } catch (error) {
     throw new Error("OpenAI response was not valid JSON.");
   }
@@ -447,10 +455,56 @@ function parseGeminiJson(data) {
   if (!outputText) throw new Error("Gemini returned an empty response.");
 
   try {
-    return JSON.parse(outputText);
+    return normalizePronunciationAnalysis(JSON.parse(outputText));
   } catch (error) {
     throw new Error("Gemini response was not valid JSON.");
   }
+}
+
+async function synthesizeWithLocalTts(rawText, rawRate, settings) {
+  const text = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 2000);
+  if (!text) throw new Error("No text to speak.");
+
+  const endpoint = String(settings.localTtsEndpoint || DEFAULT_SETTINGS.localTtsEndpoint).replace(/\/+$/, "");
+  const response = await fetch(`${endpoint}/api/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      voice: "en-US-JennyNeural",
+      rate: Number(rawRate) || 1
+    })
+  });
+
+  if (!response.ok) throw new Error(`Local TTS failed: ${response.status}`);
+  const buffer = await response.arrayBuffer();
+  const base64 = arrayBufferToBase64(buffer);
+  return {
+    mimeType: response.headers.get("content-type") || "audio/mpeg",
+    dataUrl: `data:${response.headers.get("content-type") || "audio/mpeg"};base64,${base64}`
+  };
+}
+
+function normalizePronunciationAnalysis(analysis) {
+  return {
+    original: String(analysis?.original || ""),
+    stress_skeleton: String(analysis?.stress_skeleton || ""),
+    word_stress: Array.isArray(analysis?.word_stress) ? analysis.word_stress : [],
+    linking_reduction: Array.isArray(analysis?.linking_reduction) ? analysis.linking_reduction.slice(0, 8) : [],
+    flap_t: Array.isArray(analysis?.flap_t) ? analysis.flap_t : [],
+    ipa_keywords: Array.isArray(analysis?.ipa_keywords) ? analysis.ipa_keywords : (Array.isArray(analysis?.ipa) ? analysis.ipa : []),
+    practice_tip: String(analysis?.practice_tip || "")
+  };
+}
+
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function chooseSourceLanguage(text, sourceLanguage, targetLanguage) {

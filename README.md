@@ -31,10 +31,21 @@ Safari requires Apple's converter from the full Xcode install. Command Line Tool
 
 1. Install Xcode from the Mac App Store.
 2. Open Xcode once and finish installing components.
-3. In Xcode, open **Settings > Locations** and select Xcode under **Command Line Tools**.
-4. Run `npm run convert:safari`.
-5. Open the generated Xcode project in `safari`.
-6. Build and run the app target, then enable the extension in Safari settings.
+3. Point command line tools at Xcode:
+
+   ```sh
+   sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+   ```
+
+4. Accept the Xcode license:
+
+   ```sh
+   sudo xcodebuild -license
+   ```
+
+5. Run `npm run convert:safari`.
+6. Open the generated Xcode project in `safari`.
+7. Build and run the app target, then enable the extension in Safari settings.
 
 Safari's conversion flow signs and wraps the WebExtension in a native app. Some permissions may require confirmation in Safari settings.
 
@@ -60,15 +71,15 @@ Default models:
 - OpenAI: `gpt-4.1-mini`
 - Gemini: `gemini-3.5-flash`
 
-The first version uses browser `SpeechSynthesis` for playback and prefers an available `en-US` female voice. Browser extensions cannot reliably call Microsoft Edge Read Aloud voices directly. A later local Node service can add `edge-tts` with `en-US-JennyNeural`.
-
-Example local Edge TTS direction for a later version:
+For speech playback, BiRead first tries the optional local Edge TTS service with `en-US-JennyNeural`. If the local service is not running, it falls back to browser `SpeechSynthesis`.
 
 ```sh
-npm install express edge-tts
+cd tts-server
+npm install
+npm start
 ```
 
-Then expose a localhost endpoint that accepts text and streams audio generated with `voice = en-US-JennyNeural`.
+The service listens on `http://127.0.0.1:8787` and caches MP3 files in `~/.biread-tts-cache`.
 
 ## Hover Dictionary
 
@@ -90,6 +101,7 @@ Browser PDF pronunciation analysis is planned for a second version. The current 
 npm run check
 npm run build
 npm run package:chrome
+npm run tts:server
 ```
 
 Build artifacts are written to `dist`, and the Chrome zip package is written to `outputs`.

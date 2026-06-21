@@ -3,6 +3,7 @@ let selectedText = "";
 let selectionButton = null;
 let panel = null;
 let repeatAbort = false;
+let activeAudio = null;
 
 initPronunciationPanel();
 
@@ -109,9 +110,9 @@ function buildPanelHtml(state) {
 function renderAnalysis(analysis) {
   return `
     <div class="biread-pronunciation-actions">
-      <button type="button" data-play="normal">Play normal speed</button>
-      <button type="button" data-play="slow">Play slow speed</button>
-      <button type="button" data-play="repeat">Repeat 3 times</button>
+      <button type="button" data-play="normal">Play Normal</button>
+      <button type="button" data-play="slow">Play Slow</button>
+      <button type="button" data-play="repeat">Repeat 3x</button>
     </div>
     <label class="biread-pronunciation-toggle">
       <input type="checkbox" data-show-ipa>
@@ -126,7 +127,7 @@ function renderAnalysis(analysis) {
     ${renderList("闪音提示", analysis.flap_t, item => `<b>${escapeHtml(item.text)}</b><span>${escapeHtml(item.note)}</span>`)}
     <section class="biread-pronunciation-ipa" hidden>
       <h2>关键词 IPA</h2>
-      ${renderPlainList(analysis.ipa, item => `<b>${escapeHtml(item.word)}</b><span>${escapeHtml(item.ipa)}</span>`)}
+      ${renderPlainList(analysis.ipa_keywords, item => `<b>${escapeHtml(item.word)}</b><span>${escapeHtml(item.ipa)}</span>`)}
     </section>
     <section>
       <h2>学习建议</h2>
@@ -151,6 +152,7 @@ function renderPlainList(items = [], renderer) {
 
 async function speakText(text, rate, times) {
   repeatAbort = true;
+  activeAudio?.pause();
   window.speechSynthesis?.cancel();
   await delay(60);
   repeatAbort = false;
@@ -163,6 +165,23 @@ async function speakText(text, rate, times) {
 }
 
 function speakOnce(text, rate) {
+  return speakWithLocalTts(text, rate).catch(() => speakWithBrowserVoice(text, rate));
+}
+
+async function speakWithLocalTts(text, rate) {
+  const response = await sendMessage({ type: "BIREAD_TTS_LOCAL", text, rate });
+  if (!response?.ok || !response.audio?.dataUrl) throw new Error(response?.error || "Local TTS unavailable");
+
+  activeAudio?.pause();
+  activeAudio = new Audio(response.audio.dataUrl);
+  await activeAudio.play();
+  await new Promise(resolve => {
+    activeAudio.onended = resolve;
+    activeAudio.onerror = resolve;
+  });
+}
+
+function speakWithBrowserVoice(text, rate) {
   return new Promise(resolve => {
     if (!("speechSynthesis" in window)) {
       resolve();
@@ -193,6 +212,7 @@ function getPanelOriginal() {
 
 function closePanel() {
   repeatAbort = true;
+  activeAudio?.pause();
   window.speechSynthesis?.cancel();
   panel?.remove();
   panel = null;

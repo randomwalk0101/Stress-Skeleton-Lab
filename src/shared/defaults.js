@@ -11,11 +11,12 @@ export const DEFAULT_SETTINGS = {
   hoverDictionary: false,
   autoSpeak: true,
   pronunciationAnalyzer: true,
-  pronunciationProvider: "openai",
+  pronunciationProvider: "gemini",
   openaiModel: "gpt-4.1-mini",
   openaiApiKey: "",
   geminiModel: "gemini-3.5-flash",
   geminiApiKey: "",
+  localTtsEndpoint: "http://127.0.0.1:8787",
   minTextLength: 12,
   maxPageItems: 80
 };
