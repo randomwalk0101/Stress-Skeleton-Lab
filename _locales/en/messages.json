@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "BiRead Translator"
+  },
+  "extensionDescription": {
+    "message": "English and Simplified Chinese bilingual translation for Wikipedia, YouTube captions, and local reading."
+  }
+}
