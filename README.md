@@ -2,7 +2,11 @@
 
 ## English
 
-Stress Skeleton is a pronunciation-first WebExtension for English learners. It keeps the live-page pronunciation analysis workflow for websites such as Wikipedia and adds a real-time stress-skeleton overlay for YouTube English subtitles.
+Stress Skeleton Lab is a pronunciation-first WebExtension for English learners. It keeps the live-page pronunciation analysis workflow for websites such as Wikipedia and adds a real-time stress-skeleton overlay for YouTube English subtitles.
+
+### About
+
+This project helps English learners practice pronunciation, rhythm, linking, and stress patterns while reading live pages or watching English subtitles.
 
 ### Quick Start
 
@@ -29,8 +33,8 @@ This creates ready-to-install browser builds in `outputs/browser-builds/`.
 If you prefer the zip package, use:
 
 ```text
-outputs/browser-builds/bi-read-pronunciation-chrome.zip
-outputs/browser-builds/bi-read-pronunciation-edge.zip
+outputs/browser-builds/stress-skeleton-lab-chrome.zip
+outputs/browser-builds/stress-skeleton-lab-edge.zip
 ```
 
 #### Firefox
@@ -43,7 +47,7 @@ outputs/browser-builds/bi-read-pronunciation-edge.zip
 For the packaged upload file, use:
 
 ```text
-outputs/browser-builds/bi-read-pronunciation-firefox.zip
+outputs/browser-builds/stress-skeleton-lab-firefox.zip
 ```
 
 #### Safari
@@ -53,6 +57,12 @@ npm run convert:safari
 ```
 
 Then open the generated Xcode project in `safari/`, build the app target, and enable the extension in Safari settings.
+
+For the packaged release file, use:
+
+```text
+outputs/browser-builds/stress-skeleton-lab-safari.zip
+```
 
 ### Features
 
@@ -96,6 +106,7 @@ Single-browser packaging is also available:
 npm run package:chrome
 npm run package:edge
 npm run package:firefox
+npm run package:safari
 ```
 
 ### Install In Chrome Or Edge
@@ -163,7 +174,11 @@ The local server listens on `http://127.0.0.1:8787`.
 
 ## 简体中文
 
-Stress Skeleton 是一个以英语发音训练为核心的 WebExtension。它保留了网页上的发音分析流程，并新增了 YouTube 英文字幕的实时重音骨架浮层，方便跟读练习。
+Stress Skeleton Lab 是一个以英语发音训练为核心的 WebExtension。它保留了网页上的发音分析流程，并新增了 YouTube 英文字幕的实时重音骨架浮层，方便跟读练习。
+
+### 关于
+
+这个项目帮助英语学习者在浏览网页或观看英文字幕时练习发音、节奏、连读和重音模式。
 
 ### 功能
 
@@ -207,6 +222,7 @@ npm run package:browsers
 npm run package:chrome
 npm run package:edge
 npm run package:firefox
+npm run package:safari
 ```
 
 ### 在 Chrome 或 Edge 中安装
@@ -237,6 +253,12 @@ npm run convert:safari
 ```
 
 然后打开 `safari` 目录中的 Xcode 工程，构建 app target，并在 Safari 设置中启用扩展。
+
+如果用于分发，请使用：
+
+```text
+outputs/browser-builds/stress-skeleton-lab-safari.zip
+```
 
 ### 选项
 

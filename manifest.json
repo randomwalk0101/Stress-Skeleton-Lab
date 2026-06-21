@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Stress Skeleton",
-  "short_name": "Stress Skeleton",
+  "name": "Stress Skeleton Lab",
+  "short_name": "Stress Skeleton Lab",
   "version": "0.1.1",
   "description": "Pronunciation analysis for live web pages and local reading.",
   "default_locale": "en",
@@ -26,7 +26,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Stress Skeleton",
+    "default_title": "Stress Skeleton Lab",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "assets/icon-16.png",

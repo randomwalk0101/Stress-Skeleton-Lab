@@ -1,5 +1,5 @@
 {
-  "name": "bi-read-pronunciation",
+  "name": "stress-skeleton-lab",
   "version": "0.1.0",
   "description": "A pronunciation-focused WebExtension for Chrome, Edge, Firefox, and Safari.",
   "private": true,
@@ -11,7 +11,8 @@
     "package:chrome": "npm run package:browsers -- chrome",
     "package:edge": "npm run package:browsers -- edge",
     "package:firefox": "npm run package:browsers -- firefox",
-    "convert:safari": "npm run build && xcrun safari-web-extension-converter dist --project-location safari --app-name BiReadTranslator --bundle-identifier com.codex.bireadtranslator",
+    "package:safari": "npm run convert:safari",
+    "convert:safari": "npm run build && xcrun safari-web-extension-converter dist --project-location safari --app-name \"Stress Skeleton Lab\" --bundle-identifier com.codex.stressskeletonlab",
     "check": "node scripts/check.mjs",
     "tts:server": "npm --prefix tts-server start"
   },
