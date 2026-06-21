@@ -99,15 +99,23 @@ async function getSettings() {
 
 async function saveSettings(nextSettings) {
   const settings = { ...DEFAULT_SETTINGS, ...nextSettings };
-  const { openaiApiKey, openaiModel, ...syncSettings } = settings;
+  const { openaiApiKey, openaiModel, geminiApiKey, geminiModel, ...syncSettings } = settings;
   await api.storage.sync.set({ [STORAGE_KEYS.settings]: syncSettings });
   await api.storage.local.set({
     [STORAGE_KEYS.secrets]: {
       openaiApiKey: openaiApiKey || "",
-      openaiModel: openaiModel || DEFAULT_SETTINGS.openaiModel
+      openaiModel: openaiModel || DEFAULT_SETTINGS.openaiModel,
+      geminiApiKey: geminiApiKey || "",
+      geminiModel: geminiModel || DEFAULT_SETTINGS.geminiModel
     }
   });
-  return { ...syncSettings, openaiApiKey: openaiApiKey || "", openaiModel: openaiModel || DEFAULT_SETTINGS.openaiModel };
+  return {
+    ...syncSettings,
+    openaiApiKey: openaiApiKey || "",
+    openaiModel: openaiModel || DEFAULT_SETTINGS.openaiModel,
+    geminiApiKey: geminiApiKey || "",
+    geminiModel: geminiModel || DEFAULT_SETTINGS.geminiModel
+  };
 }
 
 async function translateBatch(items, settings) {
@@ -216,6 +224,12 @@ async function lookupWord(rawWord, settings) {
 async function analyzePronunciation(rawText, settings) {
   const text = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 2400);
   if (!text) throw new Error("Please select English text first.");
+  return settings.pronunciationProvider === "gemini"
+    ? analyzePronunciationWithGemini(text, settings)
+    : analyzePronunciationWithOpenAI(text, settings);
+}
+
+async function analyzePronunciationWithOpenAI(text, settings) {
   if (!settings.openaiApiKey) throw new Error("OpenAI API key is not configured. Open the extension options page and save your key.");
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -263,6 +277,37 @@ async function analyzePronunciation(rawText, settings) {
   }
 
   return parseOpenAIJson(data);
+}
+
+async function analyzePronunciationWithGemini(text, settings) {
+  if (!settings.geminiApiKey) throw new Error("Gemini API key is not configured. Open the extension options page and save your key.");
+
+  const model = encodeURIComponent(settings.geminiModel || DEFAULT_SETTINGS.geminiModel);
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(settings.geminiApiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{
+          text: "You are an American English pronunciation coach for Chinese-speaking learners. Return only valid JSON matching the requested shape. Keep Chinese notes concise and practical."
+        }]
+      },
+      contents: [{
+        parts: [{ text: buildPronunciationPrompt(text) }]
+      }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: geminiPronunciationSchema()
+      }
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `Gemini request failed: ${response.status}`);
+  }
+
+  return parseGeminiJson(data);
 }
 
 function buildPronunciationPrompt(text) {
@@ -331,6 +376,55 @@ function pronunciationSchema() {
   };
 }
 
+function geminiPronunciationSchema() {
+  const item = properties => ({
+    type: "OBJECT",
+    properties,
+    required: Object.keys(properties)
+  });
+
+  return {
+    type: "OBJECT",
+    properties: {
+      original: { type: "STRING" },
+      stress_skeleton: { type: "STRING" },
+      word_stress: {
+        type: "ARRAY",
+        items: item({
+          word: { type: "STRING" },
+          stress: { type: "STRING" },
+          note: { type: "STRING" }
+        })
+      },
+      linking_reduction: {
+        type: "ARRAY",
+        items: item({
+          text: { type: "STRING" },
+          type: { type: "STRING" },
+          note: { type: "STRING" }
+        })
+      },
+      flap_t: {
+        type: "ARRAY",
+        items: item({
+          text: { type: "STRING" },
+          note: { type: "STRING" }
+        })
+      },
+      ipa: {
+        type: "ARRAY",
+        items: item({
+          word: { type: "STRING" },
+          ipa: { type: "STRING" }
+        })
+      },
+      practice_tip: { type: "STRING" }
+    },
+    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa", "practice_tip"],
+    propertyOrdering: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa", "practice_tip"]
+  };
+}
+
 function parseOpenAIJson(data) {
   const outputText = data.output_text || data.output?.flatMap(item => item.content || [])
     .map(part => part.text || "")
@@ -342,6 +436,20 @@ function parseOpenAIJson(data) {
     return JSON.parse(outputText);
   } catch (error) {
     throw new Error("OpenAI response was not valid JSON.");
+  }
+}
+
+function parseGeminiJson(data) {
+  const outputText = data.candidates?.[0]?.content?.parts
+    ?.map(part => part.text || "")
+    .join("")
+    .trim();
+  if (!outputText) throw new Error("Gemini returned an empty response.");
+
+  try {
+    return JSON.parse(outputText);
+  } catch (error) {
+    throw new Error("Gemini response was not valid JSON.");
   }
 }
 

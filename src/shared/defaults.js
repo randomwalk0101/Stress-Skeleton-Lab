@@ -11,8 +11,11 @@ export const DEFAULT_SETTINGS = {
   hoverDictionary: false,
   autoSpeak: true,
   pronunciationAnalyzer: true,
+  pronunciationProvider: "openai",
   openaiModel: "gpt-4.1-mini",
   openaiApiKey: "",
+  geminiModel: "gemini-3.5-flash",
+  geminiApiKey: "",
   minTextLength: 12,
   maxPageItems: 80
 };

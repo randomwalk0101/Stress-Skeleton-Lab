@@ -27,12 +27,18 @@ For local files, open the extension details in Chrome and enable **Allow access 
 
 ## Install In Safari
 
-1. Install Xcode and Safari extension tooling.
-2. Run `npm run convert:safari`.
-3. Open the generated Xcode project in `safari`.
-4. Build and run the app target, then enable the extension in Safari settings.
+Safari requires Apple's converter from the full Xcode install. Command Line Tools alone are not enough.
+
+1. Install Xcode from the Mac App Store.
+2. Open Xcode once and finish installing components.
+3. In Xcode, open **Settings > Locations** and select Xcode under **Command Line Tools**.
+4. Run `npm run convert:safari`.
+5. Open the generated Xcode project in `safari`.
+6. Build and run the app target, then enable the extension in Safari settings.
 
 Safari's conversion flow signs and wraps the WebExtension in a native app. Some permissions may require confirmation in Safari settings.
+
+For local unsigned testing, enable Safari's Develop menu, then choose **Develop > Allow Unsigned Extensions**.
 
 ## Translation Providers
 
@@ -47,7 +53,12 @@ Automatic page translation and hover dictionary are off by default to avoid send
 
 ## Pronunciation Analyzer
 
-Open the options page and save an OpenAI API key. The key is stored in `chrome.storage.local`, not in source code. When text is selected, BiRead shows an **Analyze Pronunciation** button. Clicking it sends only the selected text to OpenAI and renders the returned JSON in a dictionary-style floating panel.
+Open the options page, choose OpenAI or Gemini as the pronunciation provider, and save the matching API key. Keys are stored in `chrome.storage.local`, not in source code. When text is selected, BiRead shows an **Analyze Pronunciation** button. Clicking it sends only the selected text to the configured provider and renders the returned JSON in a dictionary-style floating panel.
+
+Default models:
+
+- OpenAI: `gpt-4.1-mini`
+- Gemini: `gemini-3.5-flash`
 
 The first version uses browser `SpeechSynthesis` for playback and prefers an available `en-US` female voice. Browser extensions cannot reliably call Microsoft Edge Read Aloud voices directly. A later local Node service can add `edge-tts` with `en-US-JennyNeural`.
 
