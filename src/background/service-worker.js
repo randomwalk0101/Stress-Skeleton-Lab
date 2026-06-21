@@ -76,18 +76,38 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "BIREAD_ANALYZE_PRONUNCIATION") {
+    getSettings()
+      .then(settings => analyzePronunciation(message.text, settings))
+      .then(analysis => sendResponse({ ok: true, analysis }))
+      .catch(error => sendResponse(toError(error)));
+    return true;
+  }
+
   return false;
 });
 
 async function getSettings() {
   const stored = await api.storage.sync.get(STORAGE_KEYS.settings);
-  return { ...DEFAULT_SETTINGS, ...(stored[STORAGE_KEYS.settings] || {}) };
+  const local = await api.storage.local.get(STORAGE_KEYS.secrets);
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(stored[STORAGE_KEYS.settings] || {}),
+    ...(local[STORAGE_KEYS.secrets] || {})
+  };
 }
 
 async function saveSettings(nextSettings) {
   const settings = { ...DEFAULT_SETTINGS, ...nextSettings };
-  await api.storage.sync.set({ [STORAGE_KEYS.settings]: settings });
-  return settings;
+  const { openaiApiKey, openaiModel, ...syncSettings } = settings;
+  await api.storage.sync.set({ [STORAGE_KEYS.settings]: syncSettings });
+  await api.storage.local.set({
+    [STORAGE_KEYS.secrets]: {
+      openaiApiKey: openaiApiKey || "",
+      openaiModel: openaiModel || DEFAULT_SETTINGS.openaiModel
+    }
+  });
+  return { ...syncSettings, openaiApiKey: openaiApiKey || "", openaiModel: openaiModel || DEFAULT_SETTINGS.openaiModel };
 }
 
 async function translateBatch(items, settings) {
@@ -191,6 +211,138 @@ async function lookupWord(rawWord, settings) {
   };
   memoryCache.set(cacheKey, entry);
   return entry;
+}
+
+async function analyzePronunciation(rawText, settings) {
+  const text = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 2400);
+  if (!text) throw new Error("Please select English text first.");
+  if (!settings.openaiApiKey) throw new Error("OpenAI API key is not configured. Open the extension options page and save your key.");
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${settings.openaiApiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: settings.openaiModel || DEFAULT_SETTINGS.openaiModel,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: "You are an American English pronunciation coach for Chinese-speaking learners. Return only valid JSON matching the requested shape. Keep Chinese notes concise and practical."
+            }
+          ]
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildPronunciationPrompt(text)
+            }
+          ]
+        }
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "pronunciation_analysis",
+          strict: true,
+          schema: pronunciationSchema()
+        }
+      }
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `OpenAI request failed: ${response.status}`);
+  }
+
+  return parseOpenAIJson(data);
+}
+
+function buildPronunciationPrompt(text) {
+  return `Analyze this selected English text for American English pronunciation practice.
+
+Selected text:
+${text}
+
+Return JSON with:
+- original: the exact original text
+- stress_skeleton: phrase groups split with /, marking main stressed words in uppercase
+- word_stress: multi-syllable words only; mark stressed syllables in uppercase, with a short Chinese note
+- linking_reduction: weak forms, linking, reductions, elision, concise Chinese notes
+- flap_t: /t/ or /d/ places that may become American flap, concise Chinese notes
+- ipa: important words only, with General American IPA
+- practice_tip: one short Chinese sentence telling the learner what to imitate most`;
+}
+
+function pronunciationSchema() {
+  const item = properties => ({
+    type: "object",
+    additionalProperties: false,
+    properties,
+    required: Object.keys(properties)
+  });
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      original: { type: "string" },
+      stress_skeleton: { type: "string" },
+      word_stress: {
+        type: "array",
+        items: item({
+          word: { type: "string" },
+          stress: { type: "string" },
+          note: { type: "string" }
+        })
+      },
+      linking_reduction: {
+        type: "array",
+        items: item({
+          text: { type: "string" },
+          type: { type: "string" },
+          note: { type: "string" }
+        })
+      },
+      flap_t: {
+        type: "array",
+        items: item({
+          text: { type: "string" },
+          note: { type: "string" }
+        })
+      },
+      ipa: {
+        type: "array",
+        items: item({
+          word: { type: "string" },
+          ipa: { type: "string" }
+        })
+      },
+      practice_tip: { type: "string" }
+    },
+    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa", "practice_tip"]
+  };
+}
+
+function parseOpenAIJson(data) {
+  const outputText = data.output_text || data.output?.flatMap(item => item.content || [])
+    .map(part => part.text || "")
+    .join("")
+    .trim();
+  if (!outputText) throw new Error("OpenAI returned an empty response.");
+
+  try {
+    return JSON.parse(outputText);
+  } catch (error) {
+    throw new Error("OpenAI response was not valid JSON.");
+  }
 }
 
 function chooseSourceLanguage(text, sourceLanguage, targetLanguage) {

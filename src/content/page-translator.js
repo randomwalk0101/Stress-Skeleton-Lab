@@ -25,7 +25,7 @@ async function initPageTranslator() {
     return false;
   });
 
-  if (settings.pageAutoTranslate || isWikipediaArticle()) {
+  if (settings.pageAutoTranslate) {
     translatePage();
   }
 }
@@ -90,10 +90,6 @@ function renderTranslation(node, translatedText) {
   translation.className = "biread-translation";
   translation.textContent = translatedText;
   node.insertAdjacentElement("afterend", translation);
-}
-
-function isWikipediaArticle() {
-  return location.hostname.endsWith("wikipedia.org") && document.querySelector("#mw-content-text");
 }
 
 function showPopover(text) {

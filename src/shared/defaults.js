@@ -8,8 +8,11 @@ export const DEFAULT_SETTINGS = {
   libreApiKey: "",
   pageAutoTranslate: false,
   youtubeMode: "bilingual",
-  hoverDictionary: true,
+  hoverDictionary: false,
   autoSpeak: true,
+  pronunciationAnalyzer: true,
+  openaiModel: "gpt-4.1-mini",
+  openaiApiKey: "",
   minTextLength: 12,
   maxPageItems: 80
 };
@@ -22,5 +25,6 @@ export const LANGUAGE_LABELS = {
 
 export const STORAGE_KEYS = {
   settings: "biread.settings",
+  secrets: "biread.secrets",
   cache: "biread.cache"
 };

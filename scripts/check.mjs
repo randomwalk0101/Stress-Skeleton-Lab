@@ -5,6 +5,7 @@ const required = [
   "src/background/service-worker.js",
   "src/content/page-translator.js",
   "src/content/hover-dictionary.js",
+  "src/content/pronunciation-panel.js",
   "src/content/youtube-captions.js",
   "src/popup/popup.html",
   "src/options/options.html",

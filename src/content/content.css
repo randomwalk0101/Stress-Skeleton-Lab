@@ -80,3 +80,126 @@
 .biread-dict-meaning {
   margin-top: 6px;
 }
+
+.biread-pronunciation-button {
+  background: #1f6f5b;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(13, 29, 23, 0.22);
+  color: #fff;
+  cursor: pointer;
+  font: 700 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 32px;
+  padding: 0 11px;
+  position: absolute;
+  z-index: 2147483647;
+}
+
+.biread-pronunciation-panel {
+  background: #fffdf8;
+  border: 1px solid #c9d4cc;
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(14, 28, 23, 0.24);
+  color: #17201d;
+  display: grid;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  gap: 12px;
+  max-height: min(680px, calc(100vh - 32px));
+  max-width: min(520px, calc(100vw - 32px));
+  overflow: auto;
+  padding: 14px;
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  width: 520px;
+  z-index: 2147483647;
+}
+
+.biread-pronunciation-panel header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.biread-pronunciation-panel header strong {
+  color: #1f6f5b;
+  font-size: 16px;
+}
+
+.biread-pronunciation-panel header button {
+  background: transparent;
+  border: 0;
+  color: #5b6962;
+  cursor: pointer;
+  font: 700 18px/1 Arial, sans-serif;
+}
+
+.biread-pronunciation-original {
+  background: #f3f0e8;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.biread-pronunciation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.biread-pronunciation-actions button {
+  background: #1f6f5b;
+  border: 1px solid #1f6f5b;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font: 700 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.biread-pronunciation-panel h2 {
+  color: #30413a;
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.biread-pronunciation-panel section {
+  display: grid;
+  gap: 5px;
+}
+
+.biread-pronunciation-panel p,
+.biread-pronunciation-panel ul {
+  margin: 0;
+}
+
+.biread-pronunciation-panel ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+}
+
+.biread-pronunciation-panel li span,
+.biread-pronunciation-panel li em {
+  color: #53635c;
+  display: block;
+  font-style: normal;
+}
+
+.biread-pronunciation-toggle {
+  align-items: center;
+  color: #30413a;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 7px;
+}
+
+.biread-pronunciation-muted {
+  color: #64736c;
+}
+
+.biread-pronunciation-error {
+  color: #a33a2b;
+  font-weight: 700;
+}
