@@ -1,13 +1,13 @@
 body {
   background: #fbfaf6;
   color: #18221f;
-  font: 17px/1.7 Georgia, "Times New Roman", serif;
+  font: 23px/1.82 Georgia, "Times New Roman", serif;
   margin: 0;
 }
 
 main {
   display: grid;
-  grid-template-columns: 280px minmax(0, 820px);
+  grid-template-columns: 224px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -17,7 +17,7 @@ aside {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 24px;
+  padding: 22px 16px;
 }
 
 h1 {
@@ -26,13 +26,18 @@ h1 {
 }
 
 input,
-select,
 button {
   border: 1px solid #abb8b0;
   border-radius: 8px;
   font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 40px;
   padding: 0 10px;
+}
+
+.hint {
+  color: #4f6258;
+  font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
 }
 
 button {
@@ -42,24 +47,63 @@ button {
   font-weight: 800;
 }
 
+button.secondary {
+  background: #f7faf7;
+  color: #1f4f43;
+}
+
 article {
-  padding: 42px min(7vw, 72px);
+  box-sizing: border-box;
+  padding: 32px clamp(30px, 4vw, 64px);
+  width: 100%;
 }
 
 .para {
   margin: 0 0 1.1em;
-  white-space: pre-wrap;
+  max-width: none;
+  text-align: justify;
+  text-justify: inter-word;
+  white-space: normal;
+  width: 100%;
+  word-spacing: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
 }
 
-.translation {
-  border-left: 3px solid #2f7d68;
-  color: #245447;
-  display: block;
+.para[data-source="pdf"] {
+  text-align: left;
+  text-justify: auto;
+  hyphens: none;
+}
+
+.biread-pronunciation-panel--inline {
+  margin: 0.85em 0 1.2em;
+  position: static;
+  width: 100%;
+}
+
+body .biread-pronunciation-panel {
+  font: 19px/1.7 Georgia, "Times New Roman", serif;
+}
+
+body .biread-pronunciation-panel header strong,
+body .biread-pronunciation-panel header button,
+body .biread-pronunciation-actions button,
+body .biread-pronunciation-toggle {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 0.94em;
-  line-height: 1.65;
-  margin-top: 0.35em;
-  padding-left: 0.7em;
+}
+
+body .biread-pronunciation-panel header strong {
+  font-size: 17px;
+}
+
+body .biread-pronunciation-panel h2 {
+  font: 700 18px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body .biread-pronunciation-original {
+  font-size: 18px;
 }
 
 @media (max-width: 760px) {

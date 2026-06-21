@@ -3,60 +3,31 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BiRead Translator</title>
+    <title>Stress Skeleton</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main>
       <header>
-        <h1>BiRead</h1>
+        <h1>Stress Skeleton</h1>
         <label class="switch">
           <input id="enabled" type="checkbox">
           <span></span>
         </label>
       </header>
 
-      <section>
-        <label for="displayMode">Page mode</label>
-        <select id="displayMode">
-          <option value="bilingual">Bilingual</option>
-          <option value="translation">Translation only</option>
-          <option value="original">Original only</option>
-        </select>
-      </section>
-
-      <section>
-        <label for="targetLanguage">Target</label>
-        <select id="targetLanguage">
-          <option value="zh-CN">Simplified Chinese</option>
-          <option value="en">English</option>
-        </select>
-      </section>
-
-      <section>
-        <label for="youtubeMode">YouTube subtitles</label>
-        <select id="youtubeMode">
-          <option value="bilingual">English + Chinese</option>
-          <option value="chinese">Chinese</option>
-          <option value="english">English</option>
-          <option value="off">Off</option>
-        </select>
-      </section>
-
-      <label class="checkline">
-        <input id="hoverDictionary" type="checkbox">
-        Hover dictionary
-      </label>
-
       <label class="checkline">
         <input id="autoSpeak" type="checkbox">
         Auto pronounce
       </label>
 
+      <label class="checkline">
+        <input id="youtubeStressOverlay" type="checkbox">
+        YouTube realtime stress
+      </label>
+
       <div class="actions">
-        <button id="translatePage" type="button">Translate page</button>
         <button id="openReader" type="button">Open local reader</button>
-        <button id="openOptions" type="button">Options</button>
       </div>
 
       <p id="status" role="status"></p>

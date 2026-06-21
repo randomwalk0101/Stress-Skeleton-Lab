@@ -3,35 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BiRead Options</title>
+    <title>BiRead Pronunciation Options</title>
     <link rel="stylesheet" href="options.css">
   </head>
   <body>
     <main>
-      <h1>BiRead Options</h1>
+      <h1>BiRead Pronunciation Options</h1>
 
       <form id="optionsForm">
         <label>
-          Provider
-          <select id="provider">
-            <option value="mymemory">MyMemory</option>
-            <option value="libretranslate">LibreTranslate</option>
-          </select>
-        </label>
-
-        <label>
-          LibreTranslate endpoint
-          <input id="libreEndpoint" type="url" placeholder="https://libretranslate.com/translate">
-        </label>
-
-        <label>
-          LibreTranslate API key
-          <input id="libreApiKey" type="password" autocomplete="off">
-        </label>
-
-        <label>
           Pronunciation analyzer provider
           <select id="pronunciationProvider">
+            <option value="local">Local rules</option>
             <option value="openai">OpenAI</option>
             <option value="gemini">Gemini</option>
           </select>
@@ -70,21 +53,6 @@
         <label>
           Maximum page items
           <input id="maxPageItems" type="number" min="1" max="300">
-        </label>
-
-        <label class="checkbox">
-          <input id="pageAutoTranslate" type="checkbox">
-          Auto-translate supported pages
-        </label>
-
-        <label class="checkbox">
-          <input id="hoverDictionary" type="checkbox">
-          Enable hover dictionary
-        </label>
-
-        <label class="checkbox">
-          <input id="autoSpeak" type="checkbox">
-          Pronounce hovered words automatically
         </label>
 
         <label class="checkbox">

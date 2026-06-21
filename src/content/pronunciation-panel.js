@@ -1,9 +1,14 @@
+if (!globalThis.__bireadPronunciationPanelLoaded) {
+globalThis.__bireadPronunciationPanelLoaded = true;
+
 let pronunciationSettings = null;
 let selectedText = "";
 let selectionButton = null;
 let panel = null;
 let repeatAbort = false;
 let activeAudio = null;
+let selectedRect = null;
+let selectedHostNode = null;
 
 initPronunciationPanel();
 
@@ -31,15 +36,17 @@ function handleSelection() {
   if (!pronunciationSettings?.pronunciationAnalyzer) return;
   setTimeout(() => {
     const selection = window.getSelection();
-    const text = selection?.toString().replace(/\s+/g, " ").trim() || "";
+    const text = cleanPronunciationText(getSelectionText(selection));
     if (!isEnglishSelection(text)) {
       removeSelectionButton();
       return;
     }
 
     selectedText = text.slice(0, 2400);
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
-    showSelectionButton(rect);
+    if (!selection.rangeCount) return;
+    selectedRect = selection.getRangeAt(0).getBoundingClientRect();
+    selectedHostNode = getSelectionHostNode(selection);
+    showSelectionButton(selectedRect);
   }, 20);
 }
 
@@ -57,7 +64,7 @@ function showSelectionButton(rect) {
 
 async function analyzeSelection() {
   removeSelectionButton();
-  showPanel({ loading: true, original: selectedText });
+  showPanel({ loading: true, original: selectedText }, selectedRect);
 
   const response = await sendMessage({ type: "BIREAD_ANALYZE_PRONUNCIATION", text: selectedText }).catch(error => ({
     ok: false,
@@ -65,19 +72,27 @@ async function analyzeSelection() {
   }));
 
   if (!response?.ok) {
-    showPanel({ error: response?.error || "Pronunciation analysis failed.", original: selectedText });
+    showPanel({ error: response?.error || "Pronunciation analysis failed.", original: selectedText }, selectedRect);
     return;
   }
 
-  showPanel({ analysis: response.analysis });
+  showPanel({ analysis: response.analysis }, selectedRect);
 }
 
-function showPanel(state) {
+function showPanel(state, anchorRect = null) {
   panel?.remove();
   panel = document.createElement("section");
   panel.className = "biread-pronunciation-panel";
   panel.innerHTML = buildPanelHtml(state);
-  document.documentElement.appendChild(panel);
+  const inlineHost = getInlinePanelHost();
+  if (inlineHost?.parentNode) {
+    panel.classList.add("biread-pronunciation-panel--inline");
+    inlineHost.after(panel);
+    panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  } else {
+    document.documentElement.appendChild(panel);
+    positionPanel(panel, anchorRect);
+  }
 
   panel.querySelector("[data-close]")?.addEventListener("click", closePanel);
   panel.querySelector("[data-play='normal']")?.addEventListener("click", () => speakText(getPanelOriginal(), 1, 1));
@@ -88,9 +103,29 @@ function showPanel(state) {
   });
 }
 
+function positionPanel(node, anchorRect) {
+  if (!anchorRect) return;
+
+  node.classList.add("biread-pronunciation-panel--anchored");
+  const viewportGap = 16;
+  const preferredWidth = Math.min(1120, window.innerWidth - viewportGap * 2);
+  node.style.width = `${preferredWidth}px`;
+
+  const anchorCenter = anchorRect.left + anchorRect.width / 2 + window.scrollX;
+  const left = Math.max(
+    window.scrollX + viewportGap,
+    Math.min(anchorCenter - preferredWidth / 2, window.scrollX + window.innerWidth - preferredWidth - viewportGap)
+  );
+  const top = anchorRect.bottom + window.scrollY + 12;
+
+  node.style.left = `${left}px`;
+  node.style.top = `${top}px`;
+  node.style.right = "auto";
+}
+
 function buildPanelHtml(state) {
   const analysis = state.analysis;
-  const original = escapeHtml(analysis?.original || state.original || selectedText);
+  const original = escapeHtml(cleanPronunciationText(analysis?.original || state.original || selectedText));
   const body = state.loading
     ? `<p class="biread-pronunciation-muted">Analyzing pronunciation...</p>`
     : state.error
@@ -108,23 +143,30 @@ function buildPanelHtml(state) {
 }
 
 function renderAnalysis(analysis) {
+  const hasIpaKeywords = Array.isArray(analysis.ipa_keywords) && analysis.ipa_keywords.length > 0;
   return `
     <div class="biread-pronunciation-actions">
       <button type="button" data-play="normal">Play Normal</button>
       <button type="button" data-play="slow">Play Slow</button>
       <button type="button" data-play="repeat">Repeat 3x</button>
     </div>
-    <label class="biread-pronunciation-toggle">
+    ${hasIpaKeywords ? `<label class="biread-pronunciation-toggle">
       <input type="checkbox" data-show-ipa>
-      Show IPA
-    </label>
+      显示关键词音标 IPA
+    </label>` : ""}
     <section>
       <h2>重音骨架</h2>
-      <p>${escapeHtml(analysis.stress_skeleton || "")}</p>
+      <p>${escapeHtml(cleanPronunciationText(analysis.stress_skeleton || ""))}</p>
+    </section>
+    ${renderList("语调和停顿", analysis.intonation_pause, item => `<b>${escapeHtml(cleanPronunciationText(item.text))}</b><em>${escapeHtml(item.pattern)}</em><span>${escapeHtml(item.note)}</span>`)}
+    <section>
+      <h2>跟读节奏</h2>
+      <p>${escapeHtml(buildShadowingDrill(cleanPronunciationText(analysis.stress_skeleton || analysis.original || "")))}</p>
     </section>
     ${renderList("单词重音", analysis.word_stress, item => `<b>${escapeHtml(item.word)}</b> -> ${escapeHtml(item.stress)}<span>${escapeHtml(item.note)}</span>`)}
     ${renderList("连读、弱读、吞音", analysis.linking_reduction, item => `<b>${escapeHtml(item.text)}</b><em>${escapeHtml(item.type)}</em><span>${escapeHtml(item.note)}</span>`)}
     ${renderList("闪音提示", analysis.flap_t, item => `<b>${escapeHtml(item.text)}</b><span>${escapeHtml(item.note)}</span>`)}
+    ${renderList("易错音", analysis.sound_focus, item => `<b>${escapeHtml(item.text)}</b><em>${escapeHtml(item.sound)}</em><span>${escapeHtml(item.note)}</span>`)}
     <section class="biread-pronunciation-ipa" hidden>
       <h2>关键词 IPA</h2>
       ${renderPlainList(analysis.ipa_keywords, item => `<b>${escapeHtml(item.word)}</b><span>${escapeHtml(item.ipa)}</span>`)}
@@ -134,6 +176,44 @@ function renderAnalysis(analysis) {
       <p>${escapeHtml(analysis.practice_tip || "")}</p>
     </section>
   `;
+}
+
+function buildShadowingDrill(text) {
+  const groups = String(text)
+    .split("/")
+    .map(group => group.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!groups.length) return "先慢速听一遍，再按每个 / 意群暂停跟读，最后连续读完整段。";
+  return `按 ${groups.length} 个意群练：${groups.join(" | ")}。每组先慢读一次，再正常速度连起来。`;
+}
+
+function cleanPronunciationText(text) {
+  return String(text || "")
+    .replace(/\[\s*\d+(?:\s*[-–,]\s*\d+)*\s*\]/g, "")
+    .replace(/([.!?;:])\s*\d{1,3}(?=\s+[A-Z]|$)/g, "$1 ")
+    .replace(/([a-z])\d{1,3}(?=\s+[A-Z])/g, "$1")
+    .replace(/\[\s*citation needed\s*\]/gi, "")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function getSelectionText(selection) {
+  if (!selection?.rangeCount) return "";
+  const container = document.createElement("div");
+  for (let index = 0; index < selection.rangeCount; index += 1) {
+    container.appendChild(selection.getRangeAt(index).cloneContents());
+  }
+  container.querySelectorAll([
+    "sup.reference",
+    "sup.noprint",
+    ".reference",
+    ".mw-ref",
+    ".mw-editsection",
+    ".citation"
+  ].join(",")).forEach(element => element.remove());
+  return container.textContent || selection.toString() || "";
 }
 
 function renderList(title, items, renderer) {
@@ -223,6 +303,19 @@ function removeSelectionButton() {
   selectionButton = null;
 }
 
+function getSelectionHostNode(selection) {
+  const anchor = selection?.anchorNode;
+  return anchor?.nodeType === Node.TEXT_NODE ? anchor.parentElement : anchor;
+}
+
+function getInlinePanelHost() {
+  const host = selectedHostNode?.closest?.("p, li, dd, blockquote, .para");
+  if (!host) return null;
+  if (host.closest(".biread-pronunciation-panel")) return null;
+  if (host.matches("li") && host.parentElement?.children.length > 20) return null;
+  return host;
+}
+
 function isEnglishSelection(text) {
   return text.length >= 2 && /[A-Za-z]/.test(text) && !/[\u3400-\u9fff]/.test(text);
 }
@@ -247,4 +340,5 @@ function sendMessage(message) {
       else resolve(response);
     });
   });
+}
 }

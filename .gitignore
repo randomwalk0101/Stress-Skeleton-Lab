@@ -2,4 +2,5 @@ dist/
 safari/
 node_modules/
 outputs/*.zip
+tts-server/*.log
 .DS_Store

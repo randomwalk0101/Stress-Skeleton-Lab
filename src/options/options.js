@@ -1,7 +1,7 @@
 import { sendMessage } from "../shared/browser.js";
 
 const form = document.getElementById("optionsForm");
-const fields = ["provider", "libreEndpoint", "libreApiKey", "pronunciationProvider", "openaiApiKey", "openaiModel", "geminiApiKey", "geminiModel", "localTtsEndpoint", "minTextLength", "maxPageItems", "pageAutoTranslate", "hoverDictionary", "autoSpeak", "pronunciationAnalyzer"];
+const fields = ["pronunciationProvider", "openaiApiKey", "openaiModel", "geminiApiKey", "geminiModel", "localTtsEndpoint", "minTextLength", "maxPageItems", "pronunciationAnalyzer"];
 let settings = {};
 
 load();

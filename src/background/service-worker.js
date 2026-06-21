@@ -2,40 +2,10 @@ import { DEFAULT_SETTINGS, STORAGE_KEYS } from "../shared/defaults.js";
 
 const api = globalThis.browser || globalThis.chrome;
 const memoryCache = new Map();
-
 api.runtime.onInstalled.addListener(async () => {
   const { [STORAGE_KEYS.settings]: existing } = await api.storage.sync.get(STORAGE_KEYS.settings);
   if (!existing) {
     await api.storage.sync.set({ [STORAGE_KEYS.settings]: DEFAULT_SETTINGS });
-  }
-
-  api.contextMenus.create({
-    id: "biread-translate-selection",
-    title: "Translate with BiRead",
-    contexts: ["selection"]
-  });
-
-  api.contextMenus.create({
-    id: "biread-open-reader",
-    title: "Open BiRead local reader",
-    contexts: ["action"]
-  });
-});
-
-api.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId === "biread-open-reader") {
-    api.tabs.create({ url: api.runtime.getURL("src/reader/reader.html") });
-    return;
-  }
-
-  if (info.menuItemId === "biread-translate-selection" && tab?.id && info.selectionText) {
-    const settings = await getSettings();
-    const translatedText = await translateText(info.selectionText, settings);
-    api.tabs.sendMessage(tab.id, {
-      type: "BIREAD_SELECTION_TRANSLATED",
-      originalText: info.selectionText,
-      translatedText
-    });
   }
 });
 
@@ -49,22 +19,6 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "BIREAD_SAVE_SETTINGS") {
     saveSettings(message.settings).then(settings => sendResponse({ ok: true, settings }), error => sendResponse(toError(error)));
-    return true;
-  }
-
-  if (message.type === "BIREAD_TRANSLATE") {
-    getSettings()
-      .then(settings => translateText(message.text, { ...settings, ...message.options }))
-      .then(text => sendResponse({ ok: true, text }))
-      .catch(error => sendResponse(toError(error)));
-    return true;
-  }
-
-  if (message.type === "BIREAD_TRANSLATE_BATCH") {
-    getSettings()
-      .then(settings => translateBatch(message.items || [], { ...settings, ...message.options }))
-      .then(items => sendResponse({ ok: true, items }))
-      .catch(error => sendResponse(toError(error)));
     return true;
   }
 
@@ -126,69 +80,23 @@ async function saveSettings(nextSettings) {
   };
 }
 
-async function translateBatch(items, settings) {
-  const limited = items.filter(item => item?.text).slice(0, settings.maxPageItems || DEFAULT_SETTINGS.maxPageItems);
-  const translated = [];
-  for (const item of limited) {
-    translated.push({ id: item.id, text: await translateText(item.text, settings) });
+async function analyzePronunciation(rawText, settings) {
+  const text = cleanPronunciationText(rawText).slice(0, 2400);
+  if (!text) throw new Error("Please select English text first.");
+  if (settings.pronunciationProvider === "local" || (!settings.openaiApiKey && !settings.geminiApiKey)) {
+    return buildLocalPronunciationAnalysis(text, settings);
   }
-  return translated;
-}
+  const provider = settings.pronunciationProvider === "gemini" && settings.geminiApiKey
+    ? "gemini"
+    : "openai";
 
-async function translateText(rawText, settings) {
-  const text = normalizeText(rawText);
-  if (!text) return "";
-
-  const target = settings.targetLanguage || "zh-CN";
-  const source = chooseSourceLanguage(text, settings.sourceLanguage || "auto", target);
-  if (source === target) return text;
-
-  const cacheKey = `${settings.provider}:${source}:${target}:${text}`;
-  if (memoryCache.has(cacheKey)) return memoryCache.get(cacheKey);
-
-  const storedCache = await api.storage.local.get(STORAGE_KEYS.cache);
-  const diskCache = storedCache[STORAGE_KEYS.cache] || {};
-  if (diskCache[cacheKey]) {
-    memoryCache.set(cacheKey, diskCache[cacheKey]);
-    return diskCache[cacheKey];
+  try {
+    return await (provider === "gemini"
+      ? analyzePronunciationWithGemini(text, settings)
+      : analyzePronunciationWithOpenAI(text, settings));
+  } catch {
+    return buildLocalPronunciationAnalysis(text, settings);
   }
-
-  const translated = settings.provider === "libretranslate"
-    ? await translateWithLibre(text, source, target, settings)
-    : await translateWithMyMemory(text, source, target);
-
-  memoryCache.set(cacheKey, translated);
-  const nextCache = trimCache({ ...diskCache, [cacheKey]: translated });
-  await api.storage.local.set({ [STORAGE_KEYS.cache]: nextCache });
-  return translated;
-}
-
-async function translateWithLibre(text, source, target, settings) {
-  const endpoint = settings.libreEndpoint || DEFAULT_SETTINGS.libreEndpoint;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      q: text,
-      source: source === "auto" ? "auto" : source,
-      target: target === "zh-CN" ? "zh" : target,
-      format: "text",
-      api_key: settings.libreApiKey || undefined
-    })
-  });
-
-  if (!response.ok) throw new Error(`LibreTranslate failed: ${response.status}`);
-  const data = await response.json();
-  return data.translatedText || text;
-}
-
-async function translateWithMyMemory(text, source, target) {
-  const langpair = `${source === "auto" ? detectLanguage(text) : source}|${target === "zh-CN" ? "zh-CN" : target}`;
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langpair)}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`MyMemory failed: ${response.status}`);
-  const data = await response.json();
-  return data?.responseData?.translatedText || text;
 }
 
 async function lookupWord(rawWord, settings) {
@@ -202,7 +110,11 @@ async function lookupWord(rawWord, settings) {
   let audio = "";
   let englishMeaning = "";
 
-  const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+  const response = await fetchWithTimeout(
+    `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
+    {},
+    8000
+  );
   if (response.ok) {
     const data = await response.json();
     const first = data?.[0];
@@ -212,35 +124,21 @@ async function lookupWord(rawWord, settings) {
     englishMeaning = definitions.slice(0, 2).map(item => item.definition).filter(Boolean).join("; ");
   }
 
-  const translated = await translateText(englishMeaning || word, {
-    ...settings,
-    sourceLanguage: "en",
-    targetLanguage: "zh-CN"
-  });
-
   const entry = {
     word,
     phonetic,
     audio,
-    meaning: translated,
+    meaning: englishMeaning || word,
     englishMeaning
   };
   memoryCache.set(cacheKey, entry);
   return entry;
 }
 
-async function analyzePronunciation(rawText, settings) {
-  const text = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 2400);
-  if (!text) throw new Error("Please select English text first.");
-  return settings.pronunciationProvider === "gemini"
-    ? analyzePronunciationWithGemini(text, settings)
-    : analyzePronunciationWithOpenAI(text, settings);
-}
-
 async function analyzePronunciationWithOpenAI(text, settings) {
-  if (!settings.openaiApiKey) throw new Error("OpenAI API key is not configured. Open the extension options page and save your key.");
+  if (!settings.openaiApiKey) throw new Error("OpenAI API key is not configured in this Safari extension build. Open Options, paste the key again, and save.");
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${settings.openaiApiKey}`,
@@ -254,7 +152,7 @@ async function analyzePronunciationWithOpenAI(text, settings) {
           content: [
             {
               type: "input_text",
-              text: "You are an American English pronunciation coach for Chinese-speaking learners. Return only valid JSON matching the requested shape. Keep Chinese notes concise and practical."
+              text: "You are an American English pronunciation coach for English learners. Return only valid JSON matching the requested shape. Keep Chinese notes concise and practical."
             }
           ]
         },
@@ -277,7 +175,7 @@ async function analyzePronunciationWithOpenAI(text, settings) {
         }
       }
     })
-  });
+  }, 12000);
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -287,17 +185,208 @@ async function analyzePronunciationWithOpenAI(text, settings) {
   return parseOpenAIJson(data);
 }
 
+async function buildLocalPronunciationAnalysis(text, settings) {
+  const words = text.match(/[A-Za-z][A-Za-z'-]*/g) || [];
+  const uniqueWords = [...new Set(words.map(word => word.replace(/^['-]+|['-]+$/g, "")))];
+  const importantWords = uniqueWords
+    .filter(word => isContentWord(word) && countSyllables(word) >= 2)
+    .sort((a, b) => scoreStressWord(b) - scoreStressWord(a))
+    .slice(0, 12);
+
+  return {
+    original: text,
+    stress_skeleton: buildLocalStressSkeleton(text),
+    word_stress: importantWords.map(word => ({
+      word,
+      stress: markLikelyStress(word),
+      note: explainStressRule(word)
+    })),
+    linking_reduction: findLocalLinkingHints(text),
+    flap_t: findLocalFlapHints(text),
+    intonation_pause: buildLocalIntonationHints(text),
+    sound_focus: buildLocalSoundFocus(text),
+    ipa_keywords: [],
+    practice_tip: "本地规则分析：先按 / 断意群，重读大写内容词，功能词轻读并连接。"
+  };
+}
+
+function buildLocalStressSkeleton(text) {
+  return text
+    .split(/(?<=[.!?;:])\s+|,\s+/)
+    .map(sentence => sentence
+      .split(/\s+/)
+      .map(markSentenceWordForStress)
+      .join(" "))
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function markSentenceWordForStress(word) {
+  const clean = word.replace(/[^A-Za-z'-]/g, "");
+  if (!clean) return word;
+  if (isFunctionWord(clean)) return word.toLowerCase();
+  if (isContentWord(clean) && (clean.length >= 5 || countSyllables(clean) >= 2)) {
+    return word.replace(clean, clean.toUpperCase());
+  }
+  return word;
+}
+
+function markLikelyStress(word) {
+  const syllables = splitRoughSyllables(word);
+  if (syllables.length <= 1) return word;
+  const stressIndex = likelyStressIndex(word, syllables);
+  return syllables
+    .map((part, index) => index === stressIndex ? part.toUpperCase() : part.toLowerCase())
+    .join("-");
+}
+
+function explainStressRule(word) {
+  if (/(tion|sion|cian)$/i.test(word)) return "-tion/-sion 前一音节常重读。";
+  if (/(ic|ical|ity|ety|graphy|logy)$/i.test(word)) return "这类后缀通常让前一音节重读。";
+  if (/(ee|eer|ese|ette|oon)$/i.test(word)) return "这类后缀本身常带重音。";
+  if (/^(un|re|pre|dis|mis|non|over|under)/i.test(word)) return "前缀通常不重读，重心多在词根。";
+  return "多音节内容词通常承载句子重音。";
+}
+
+function likelyStressIndex(word, syllables) {
+  if (/(ee|eer|ese|ette|oon)$/i.test(word)) return syllables.length - 1;
+  if (/(tion|sion|cian|ic|ical|ity|ety|graphy|logy)$/i.test(word)) return Math.max(0, syllables.length - 2);
+  if (/^(un|re|pre|dis|mis|non|over|under)/i.test(word) && syllables.length > 1) return 1;
+  if (syllables.length === 2) return isLikelyVerb(word) ? 1 : 0;
+  return Math.max(0, syllables.length - 2);
+}
+
+function splitRoughSyllables(word) {
+  const clean = word.toLowerCase().replace(/[^a-z]/g, "");
+  const groups = clean.match(/[bcdfghjklmnpqrstvwxyz]*[aeiouy]+(?:[bcdfghjklmnpqrstvwxyz](?![aeiouy]))?/g) || [clean];
+  if (groups.length > 1 && groups.at(-1) === "e") groups.pop();
+  return groups.length ? groups : [word];
+}
+
+function countSyllables(word) {
+  return splitRoughSyllables(word).length;
+}
+
+function scoreStressWord(word) {
+  return word.length + countSyllables(word) * 3 + (/(tion|sion|ity|ic|ical)$/i.test(word) ? 8 : 0);
+}
+
+function isLikelyVerb(word) {
+  return /(ate|ise|ize|fy|en)$/i.test(word);
+}
+
+function isFunctionWord(word) {
+  return /^(a|an|the|and|or|but|so|yet|for|nor|to|of|in|on|at|by|from|with|as|into|onto|than|that|which|who|whom|whose|this|these|those|it|its|they|them|their|he|she|we|you|your|i|me|my|our|is|are|was|were|be|been|being|am|do|does|did|have|has|had|can|could|should|would|will|may|might|must)$/i.test(word);
+}
+
+function isContentWord(word) {
+  return /^[A-Za-z][A-Za-z'-]*$/.test(word) && !isFunctionWord(word);
+}
+
+function cleanWord(word) {
+  return word.replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+}
+
+function isVowelStart(word) {
+  return /^[aeiou]/i.test(cleanWord(word));
+}
+
+function isConsonantEnd(word) {
+  return /[bcdfghjklmnpqrstvwxyz]$/i.test(cleanWord(word));
+}
+
+function isVowelEnd(word) {
+  return /[aeiou]$/i.test(cleanWord(word));
+}
+
+function pairWords(text) {
+  const words = text.match(/[A-Za-z][A-Za-z'-]*/g) || [];
+  const pairs = [];
+  for (let index = 0; index < words.length - 1; index += 1) {
+    pairs.push([words[index], words[index + 1]]);
+  }
+  return pairs;
+}
+
+function findLocalLinkingHints(text) {
+  const hints = [];
+  for (const [first, second] of pairWords(text)) {
+    if (hints.length >= 10) break;
+    if (isFunctionWord(first)) {
+      hints.push({ text: `${first} ${second}`, type: "弱读", note: `${first} 通常弱读，贴到后面的词。` });
+      continue;
+    }
+    if (isConsonantEnd(first) && isVowelStart(second)) {
+      hints.push({ text: `${first} ${second}`, type: "辅音+元音连读", note: "前词尾辅音接到后词开头元音。" });
+      continue;
+    }
+    if (isVowelEnd(first) && isVowelStart(second)) {
+      hints.push({ text: `${first} ${second}`, type: "元音连读", note: "两个元音之间可加轻微 /j/ 或 /w/ 过渡。 " });
+    }
+  }
+  return hints;
+}
+
+function findLocalFlapHints(text) {
+  const matches = text.match(/\b\w*[aeiou]t[aeiou]\w*\b/gi) || [];
+  return matches.slice(0, 6).map(match => ({
+    text: match,
+    note: "美音中两个元音之间的 t 可能接近闪音。"
+  }));
+}
+
+function buildLocalIntonationHints(text) {
+  const chunks = text
+    .split(/(?<=[.!?])\s+|;\s+|,\s+/)
+    .map(chunk => chunk.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  return chunks.map(chunk => {
+    const last = chunk.slice(-1);
+    const pattern = last === "?" ? "升调或升降调" : "降调";
+    const note = last === "?"
+      ? "疑问句末尾保持一点上扬，重点词仍要读清楚。"
+      : "陈述信息末尾自然下降，逗号处短停不断气。";
+    return { text: chunk, pattern, note };
+  });
+}
+
+function buildLocalSoundFocus(text) {
+  const words = text.match(/[A-Za-z][A-Za-z'-]*/g) || [];
+  const candidates = [];
+  const rules = [
+    { pattern: /th/i, sound: "/θ/ /ð/", note: "舌尖轻放齿间，不要读成 /s/、/z/ 或 /d/。" },
+    { pattern: /r/i, sound: "/r/", note: "美音 r 舌尖后卷或舌身收紧，元音后也要保留。" },
+    { pattern: /v/i, sound: "/v/", note: "上齿轻触下唇并振动，不要读成 /w/。" },
+    { pattern: /w/i, sound: "/w/", note: "先圆唇再滑向后面的元音。" },
+    { pattern: /l/i, sound: "/l/", note: "词尾 l 要有舌尖抵上齿龈的收尾。" }
+  ];
+
+  for (const word of words) {
+    if (candidates.length >= 6) break;
+    const clean = cleanWord(word);
+    if (candidates.some(item => item.text.toLowerCase() === clean.toLowerCase())) continue;
+    const rule = rules.find(entry => entry.pattern.test(clean));
+    if (rule && clean.length > 2) {
+      candidates.push({ text: clean, sound: rule.sound, note: rule.note });
+    }
+  }
+
+  return candidates;
+}
+
 async function analyzePronunciationWithGemini(text, settings) {
   if (!settings.geminiApiKey) throw new Error("Gemini API key is not configured. Open the extension options page and save your key.");
 
   const model = encodeURIComponent(settings.geminiModel || DEFAULT_SETTINGS.geminiModel);
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(settings.geminiApiKey)}`, {
+  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(settings.geminiApiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       system_instruction: {
         parts: [{
-          text: "You are an American English pronunciation coach for Chinese-speaking learners. Return only valid JSON matching the requested shape. Keep Chinese notes concise and practical."
+          text: "You are an American English pronunciation coach for English learners. Return only valid JSON matching the requested shape. Keep Chinese notes concise and practical."
         }]
       },
       contents: [{
@@ -308,7 +397,7 @@ async function analyzePronunciationWithGemini(text, settings) {
         responseSchema: geminiPronunciationSchema()
       }
     })
-  });
+  }, 12000);
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -330,6 +419,8 @@ Return JSON with:
 - word_stress: multi-syllable words only; mark stressed syllables in uppercase, with a short Chinese note
 - linking_reduction: the 3 to 8 most useful weak forms, linking, reductions, and elisions; concise Chinese notes; do not over-analyze
 - flap_t: /t/ or /d/ places that may become American flap, concise Chinese notes
+- intonation_pause: phrase-level intonation and pause advice for 2 to 6 chunks; concise Chinese notes
+- sound_focus: likely difficult sounds for English learners, such as /θ/, /ð/, /r/, /v/, /w/, final /l/; concise Chinese notes
 - ipa_keywords: important words only, with General American IPA; do not transcribe the whole sentence
 - practice_tip: one short Chinese sentence telling the learner what to imitate most`;
 }
@@ -371,6 +462,22 @@ function pronunciationSchema() {
           note: { type: "string" }
         })
       },
+      intonation_pause: {
+        type: "array",
+        items: item({
+          text: { type: "string" },
+          pattern: { type: "string" },
+          note: { type: "string" }
+        })
+      },
+      sound_focus: {
+        type: "array",
+        items: item({
+          text: { type: "string" },
+          sound: { type: "string" },
+          note: { type: "string" }
+        })
+      },
       ipa_keywords: {
         type: "array",
         items: item({
@@ -380,7 +487,7 @@ function pronunciationSchema() {
       },
       practice_tip: { type: "string" }
     },
-    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa_keywords", "practice_tip"]
+    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "intonation_pause", "sound_focus", "ipa_keywords", "practice_tip"]
   };
 }
 
@@ -419,6 +526,22 @@ function geminiPronunciationSchema() {
           note: { type: "STRING" }
         })
       },
+      intonation_pause: {
+        type: "ARRAY",
+        items: item({
+          text: { type: "STRING" },
+          pattern: { type: "STRING" },
+          note: { type: "STRING" }
+        })
+      },
+      sound_focus: {
+        type: "ARRAY",
+        items: item({
+          text: { type: "STRING" },
+          sound: { type: "STRING" },
+          note: { type: "STRING" }
+        })
+      },
       ipa_keywords: {
         type: "ARRAY",
         items: item({
@@ -428,8 +551,8 @@ function geminiPronunciationSchema() {
       },
       practice_tip: { type: "STRING" }
     },
-    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa_keywords", "practice_tip"],
-    propertyOrdering: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "ipa_keywords", "practice_tip"]
+    required: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "intonation_pause", "sound_focus", "ipa_keywords", "practice_tip"],
+    propertyOrdering: ["original", "stress_skeleton", "word_stress", "linking_reduction", "flap_t", "intonation_pause", "sound_focus", "ipa_keywords", "practice_tip"]
   };
 }
 
@@ -466,7 +589,7 @@ async function synthesizeWithLocalTts(rawText, rawRate, settings) {
   if (!text) throw new Error("No text to speak.");
 
   const endpoint = String(settings.localTtsEndpoint || DEFAULT_SETTINGS.localTtsEndpoint).replace(/\/+$/, "");
-  const response = await fetch(`${endpoint}/api/tts`, {
+  const response = await fetchWithTimeout(`${endpoint}/api/tts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -474,7 +597,7 @@ async function synthesizeWithLocalTts(rawText, rawRate, settings) {
       voice: "en-US-JennyNeural",
       rate: Number(rawRate) || 1
     })
-  });
+  }, 12000);
 
   if (!response.ok) throw new Error(`Local TTS failed: ${response.status}`);
   const buffer = await response.arrayBuffer();
@@ -486,15 +609,48 @@ async function synthesizeWithLocalTts(rawText, rawRate, settings) {
 }
 
 function normalizePronunciationAnalysis(analysis) {
+  const cleanItems = (items, fields, limit = Infinity) => (Array.isArray(items) ? items.slice(0, limit) : [])
+    .map(item => {
+      const next = { ...item };
+      for (const field of fields) {
+        if (field in next) next[field] = cleanPronunciationText(next[field]);
+      }
+      return next;
+    });
+
   return {
-    original: String(analysis?.original || ""),
-    stress_skeleton: String(analysis?.stress_skeleton || ""),
-    word_stress: Array.isArray(analysis?.word_stress) ? analysis.word_stress : [],
-    linking_reduction: Array.isArray(analysis?.linking_reduction) ? analysis.linking_reduction.slice(0, 8) : [],
-    flap_t: Array.isArray(analysis?.flap_t) ? analysis.flap_t : [],
-    ipa_keywords: Array.isArray(analysis?.ipa_keywords) ? analysis.ipa_keywords : (Array.isArray(analysis?.ipa) ? analysis.ipa : []),
+    original: cleanPronunciationText(analysis?.original || ""),
+    stress_skeleton: cleanPronunciationText(analysis?.stress_skeleton || ""),
+    word_stress: cleanItems(analysis?.word_stress, ["word", "stress", "note"]),
+    linking_reduction: cleanItems(analysis?.linking_reduction, ["text", "type", "note"], 8),
+    flap_t: cleanItems(analysis?.flap_t, ["text", "note"]),
+    intonation_pause: cleanItems(analysis?.intonation_pause, ["text", "pattern", "note"], 6),
+    sound_focus: cleanItems(analysis?.sound_focus, ["text", "sound", "note"], 6),
+    ipa_keywords: cleanItems(Array.isArray(analysis?.ipa_keywords) ? analysis.ipa_keywords : (Array.isArray(analysis?.ipa) ? analysis.ipa : []), ["word", "ipa"]),
     practice_tip: String(analysis?.practice_tip || "")
   };
+}
+
+function cleanPronunciationText(text) {
+  return String(text || "")
+    .replace(/\[\s*\d+(?:\s*[-–,]\s*\d+)*\s*\]/g, "")
+    .replace(/([.!?;:])\s*\d{1,3}(?=\s+[A-Z]|$)/g, "$1 ")
+    .replace(/([a-z])\d{1,3}(?=\s+[A-Z])/g, "$1")
+    .replace(/\[\s*citation needed\s*\]/gi, "")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+
+async function fetchWithTimeout(input, init = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("Request timed out")), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function arrayBufferToBase64(buffer) {
@@ -505,26 +661,6 @@ function arrayBufferToBase64(buffer) {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
   return btoa(binary);
-}
-
-function chooseSourceLanguage(text, sourceLanguage, targetLanguage) {
-  if (sourceLanguage !== "auto") return sourceLanguage;
-  const detected = detectLanguage(text);
-  return detected === targetLanguage ? (targetLanguage === "en" ? "zh-CN" : "en") : detected;
-}
-
-function detectLanguage(text) {
-  return /[\u3400-\u9fff]/.test(text) ? "zh-CN" : "en";
-}
-
-function normalizeText(text) {
-  return String(text || "").replace(/\s+/g, " ").trim();
-}
-
-function trimCache(cache) {
-  const entries = Object.entries(cache);
-  if (entries.length <= 500) return cache;
-  return Object.fromEntries(entries.slice(entries.length - 500));
 }
 
 function toError(error) {

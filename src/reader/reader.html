@@ -3,20 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BiRead Local Reader</title>
+    <title>BiRead Reader</title>
     <link rel="stylesheet" href="reader.css">
+    <link rel="stylesheet" href="../content/content.css">
   </head>
   <body>
     <main>
       <aside>
         <h1>BiRead Reader</h1>
-        <input id="fileInput" type="file" accept=".txt,.md,.srt,.vtt,.html,.htm,text/*">
-        <select id="mode">
-          <option value="bilingual">Bilingual</option>
-          <option value="translation">Translation only</option>
-          <option value="original">Original only</option>
-        </select>
-        <button id="translate" type="button">Translate document</button>
+        <input id="fileInput" type="file" accept=".txt,.md,.srt,.vtt,.html,.htm,.pdf,text/*,application/pdf">
+        <button id="analyzeSelection" type="button" class="secondary">Analyze selected text</button>
+        <p class="hint">Load a local text or PDF file, then select any passage to analyze its pronunciation.</p>
         <p id="status"></p>
       </aside>
       <article id="document"></article>

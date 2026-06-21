@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "BiRead Translator",
-  "short_name": "BiRead",
-  "version": "0.1.0",
-  "description": "English and Simplified Chinese bilingual translation for Wikipedia, YouTube captions, and local reading.",
+  "name": "Stress Skeleton",
+  "short_name": "Stress Skeleton",
+  "version": "0.1.1",
+  "description": "Pronunciation analysis for live web pages and local reading.",
   "default_locale": "en",
   "icons": {
     "16": "assets/icon-16.png",
@@ -15,7 +15,6 @@
   },
   "permissions": [
     "activeTab",
-    "contextMenus",
     "scripting",
     "storage"
   ],
@@ -27,7 +26,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "BiRead Translator",
+    "default_title": "Stress Skeleton",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "assets/icon-16.png",
@@ -43,8 +42,6 @@
         "<all_urls>"
       ],
       "js": [
-        "src/content/page-translator.js",
-        "src/content/hover-dictionary.js",
         "src/content/pronunciation-panel.js",
         "src/content/youtube-captions.js"
       ],
