@@ -1,0 +1,5 @@
+dist/
+safari/
+node_modules/
+outputs/*.zip
+.DS_Store

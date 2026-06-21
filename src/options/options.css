@@ -1,0 +1,62 @@
+body {
+  background: #f7f6f1;
+  color: #18221f;
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 36px 20px;
+}
+
+h1 {
+  font-size: 28px;
+  margin: 0 0 24px;
+}
+
+form {
+  display: grid;
+  gap: 18px;
+}
+
+label {
+  color: #35443e;
+  display: grid;
+  font-weight: 700;
+  gap: 7px;
+}
+
+input,
+select,
+button {
+  border: 1px solid #b7c0ba;
+  border-radius: 8px;
+  font: inherit;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.checkbox {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.checkbox input {
+  min-height: auto;
+}
+
+button {
+  background: #1f6f5b;
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+  justify-self: start;
+}
+
+#status {
+  color: #1f6f5b;
+  font-weight: 700;
+}

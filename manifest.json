@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "BiRead Translator",
+  "short_name": "BiRead",
+  "version": "0.1.0",
+  "description": "English and Simplified Chinese bilingual translation for Wikipedia, YouTube captions, and local reading.",
+  "default_locale": "en",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "BiRead Translator",
+    "default_popup": "src/popup/popup.html"
+  },
+  "options_page": "src/options/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/page-translator.js",
+        "src/content/hover-dictionary.js",
+        "src/content/youtube-captions.js"
+      ],
+      "css": [
+        "src/content/content.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/reader/reader.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

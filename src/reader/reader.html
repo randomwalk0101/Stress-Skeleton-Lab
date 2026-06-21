@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BiRead Local Reader</title>
+    <link rel="stylesheet" href="reader.css">
+  </head>
+  <body>
+    <main>
+      <aside>
+        <h1>BiRead Reader</h1>
+        <input id="fileInput" type="file" accept=".txt,.md,.srt,.vtt,.html,.htm,text/*">
+        <select id="mode">
+          <option value="bilingual">Bilingual</option>
+          <option value="translation">Translation only</option>
+          <option value="original">Original only</option>
+        </select>
+        <button id="translate" type="button">Translate document</button>
+        <p id="status"></p>
+      </aside>
+      <article id="document"></article>
+    </main>
+    <script type="module" src="reader.js"></script>
+  </body>
+</html>
