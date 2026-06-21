@@ -1,4 +1,4 @@
-# Stress Skeleton
+# Stress-Skeleton-Lab
 
 ## English
 
