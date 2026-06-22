@@ -1,12 +1,6 @@
 dist/
-safari/*
-!safari/BiReadTranslator/
-!safari/BiReadTranslator/**
 safari/DerivedData/
 node_modules/
-outputs/browser-builds/*/
-outputs/browser-builds/*.zip
-outputs/*.zip
-outputs/*.app/
+outputs/
 tts-server/*.log
 .DS_Store
