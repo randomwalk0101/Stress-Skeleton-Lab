@@ -1,0 +1,14 @@
+{
+  "name": "@randomwalk0101/stress-skeleton-lab",
+  "version": "0.1.0",
+  "description": "GitHub Packages entry for Stress Skeleton Lab.",
+  "private": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/randomwalk0101/Stress-Skeleton-Lab.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}

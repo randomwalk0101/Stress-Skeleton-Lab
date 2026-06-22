@@ -1,0 +1,36 @@
+name: Publish GitHub Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "pkg-*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: "@randomwalk0101"
+          always-auth: true
+
+      - name: Set package version
+        working-directory: packages/github-package
+        run: npm pkg set version="0.1.0-${GITHUB_RUN_NUMBER}"
+
+      - name: Publish package
+        working-directory: packages/github-package
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: npm publish
