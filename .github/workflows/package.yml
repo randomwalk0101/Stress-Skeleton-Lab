@@ -70,14 +70,14 @@ jobs:
           -target "Stress Skeleton Lab (macOS)"
           -configuration Release
           -sdk macosx
-          -derivedDataPath "$PWD/outputs/safari-derived-data"
           CODE_SIGNING_ALLOWED=NO
           CODE_SIGNING_REQUIRED=NO
+          SYMROOT="$PWD/outputs/safari-build"
           build
 
       - name: Create Safari zip
         run: |
-          APP_PATH="$(find "$PWD/outputs/safari-derived-data/Build/Products" -name '*.app' -maxdepth 3 | head -n 1)"
+          APP_PATH="$(find "$PWD/outputs/safari-build" -name '*.app' -maxdepth 4 | head -n 1)"
           if [ -z "$APP_PATH" ]; then
             echo "Safari app bundle not found"
             exit 1
