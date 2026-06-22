@@ -1,0 +1,82 @@
+name: Package Builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  web-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build browser packages
+        run: npm run package:browsers
+
+      - name: Upload release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          overwrite_files: true
+          files: |
+            outputs/browser-builds/stress-skeleton-lab-chrome.zip
+            outputs/browser-builds/stress-skeleton-lab-edge.zip
+            outputs/browser-builds/stress-skeleton-lab-firefox.zip
+
+      - name: Upload workflow artifact
+        if: ${{ github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-packages
+          path: outputs/browser-builds/stress-skeleton-lab-*.zip
+          if-no-files-found: error
+
+  safari-package:
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Safari package
+        run: npm run package:safari
+
+      - name: Upload release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          overwrite_files: true
+          files: outputs/browser-builds/stress-skeleton-lab-safari.zip
+
+      - name: Upload workflow artifact
+        if: ${{ github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: safari-package
+          path: outputs/browser-builds/stress-skeleton-lab-safari.zip
+          if-no-files-found: error
