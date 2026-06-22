@@ -67,7 +67,7 @@ jobs:
         run: >
           xcodebuild
           -project "safari/Stress Skeleton Lab/Stress Skeleton Lab.xcodeproj"
-          -target "Stress Skeleton Lab (macOS)"
+          -scheme "Stress Skeleton Lab (macOS)"
           -configuration Release
           -sdk macosx
           CODE_SIGNING_ALLOWED=NO
